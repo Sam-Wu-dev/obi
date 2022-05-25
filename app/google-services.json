@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "284957706614",
+    "project_id": "obi-chat",
+    "storage_bucket": "obi-chat.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:284957706614:android:df13c6549b44fe38e4d257",
+        "android_client_info": {
+          "package_name": "com.example.obi"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "284957706614-2posb270clqjbqf5aj7mv67l4am3s33n.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDUmH-5QM9AiFnwYp73zxOLg6OeOlX-PtY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "284957706614-2posb270clqjbqf5aj7mv67l4am3s33n.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
