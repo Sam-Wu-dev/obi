@@ -11,18 +11,18 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.obi.databinding.ItemContainerRecentConversionBinding;
 import com.example.obi.listeners.ConversionListener;
-import com.example.obi.models.ChatMessage;
 import com.example.obi.models.User;
+import com.example.obi.utilities.UserManager;
 
 import java.util.List;
 
 public class RecentConversationsAdapter extends RecyclerView.Adapter<RecentConversationsAdapter.ConversionViewHolder> {
 
-    private final List<ChatMessage> chatMessages;
+    private final List<UserManager.ChatRoom> chatRooms;
     private final ConversionListener conversionListener;
 
-    public RecentConversationsAdapter(List<ChatMessage> chatMessages, ConversionListener conversionListener) {
-        this.chatMessages = chatMessages;
+    public RecentConversationsAdapter(List<UserManager.ChatRoom> chatRooms, ConversionListener conversionListener) {
+        this.chatRooms = chatRooms;
         this.conversionListener = conversionListener;
     }
 
@@ -40,12 +40,12 @@ public class RecentConversationsAdapter extends RecyclerView.Adapter<RecentConve
 
     @Override
     public void onBindViewHolder(@NonNull ConversionViewHolder holder, int position) {
-        holder.setData(chatMessages.get(position));
+        holder.setData(chatRooms.get(position));
     }
 
     @Override
     public int getItemCount() {
-        return chatMessages.size();
+        return chatRooms.size();
     }
 
     class ConversionViewHolder extends RecyclerView.ViewHolder {
@@ -56,15 +56,15 @@ public class RecentConversationsAdapter extends RecyclerView.Adapter<RecentConve
             binding = itemContainerRecentConversionBinding;
         }
 
-        void setData(ChatMessage chatMessage) {
-            binding.imageProfile.setImageBitmap(getConversionImage(chatMessage.conversionImage));
-            binding.textName.setText(chatMessage.conversionName);
-            binding.textRecentMessage.setText(chatMessage.message);
+        void setData(UserManager.ChatRoom chatRoom) {
+            binding.imageProfile.setImageBitmap(getConversionImage(chatRoom.getFriendImage()));
+            binding.textName.setText(chatRoom.getFriendName());
+            binding.textRecentMessage.setText(chatRoom.getLastMessage());
             binding.getRoot().setOnClickListener(view -> {
                 User user = new User();
-                user.id = chatMessage.conversionId;
-                user.name = chatMessage.conversionName;
-                user.image= chatMessage.conversionImage;
+                user.id = chatRoom.getFriendId();
+                user.name = chatRoom.getFriendName();
+                user.image= chatRoom.getFriendImage();
                 conversionListener.onConversionClicked(user);
             });
         }

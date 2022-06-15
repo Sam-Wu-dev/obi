@@ -1,6 +1,7 @@
 package com.example.obi.adapters;
 
 import android.graphics.Bitmap;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.ViewGroup;
 
@@ -16,7 +17,7 @@ import java.util.List;
 public class ChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder>{
     private final List<ChatMessage> chatMessages;
     private Bitmap receiverProfileImage;
-    private final String senderId;
+    private final String userId;
 
     public static final int VIEW_TYPE_SENT=1;
     public static final int VIEW_TYPE_RECEIVED=2;
@@ -25,10 +26,10 @@ public class ChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder>{
         receiverProfileImage=bitmap;
     }
 
-    public ChatAdapter(List<ChatMessage> chatMessages, Bitmap receiverProfileImage, String senderId) {
+    public ChatAdapter(List<ChatMessage> chatMessages, Bitmap receiverProfileImage, String userId) {
         this.chatMessages = chatMessages;
         this.receiverProfileImage = receiverProfileImage;
-        this.senderId = senderId;
+        this.userId = userId;
     }
 
     @NonNull
@@ -69,7 +70,8 @@ public class ChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder>{
 
     @Override
     public int getItemViewType(int position) {
-        if (chatMessages.get(position).senderID.equals(senderId)){
+        Log.d("check",chatMessages.get(position).senderId+" 1");
+        if (chatMessages.get(position).senderId.equals(userId)){
             return VIEW_TYPE_SENT;
         }else {
             return VIEW_TYPE_RECEIVED;

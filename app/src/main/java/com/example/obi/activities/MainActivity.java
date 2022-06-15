@@ -4,55 +4,63 @@ import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Message;
 import android.util.Base64;
 import android.view.View;
 import android.widget.Toast;
+
+import androidx.annotation.NonNull;
 
 import com.example.obi.adapters.RecentConversationsAdapter;
 import com.example.obi.databinding.ActivityMainBinding;
 import com.example.obi.listeners.ConversionListener;
 import com.example.obi.models.ChatMessage;
 import com.example.obi.models.User;
+import com.example.obi.network.FriendTask;
+import com.example.obi.network.TcpClient;
 import com.example.obi.utilities.Constants;
 import com.example.obi.utilities.PreferenceManager;
-import com.google.firebase.firestore.DocumentChange;
-import com.google.firebase.firestore.DocumentReference;
-import com.google.firebase.firestore.EventListener;
-import com.google.firebase.firestore.FieldValue;
-import com.google.firebase.firestore.FirebaseFirestore;
-import com.google.firebase.firestore.QuerySnapshot;
-import com.google.firebase.messaging.FirebaseMessaging;
+import com.example.obi.utilities.UserManager;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
+import java.util.Date;
+import java.util.Locale;
 
 public class MainActivity extends BaseActivity implements ConversionListener {
 
     private ActivityMainBinding binding;
     private PreferenceManager preferenceManager;
-    private List<ChatMessage> conversations;
     private RecentConversationsAdapter conversationsAdapter;
-    private FirebaseFirestore database;
+    private UserManager userManager;
+    private TcpClient tcpClient;
+    private String userId;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         binding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
         preferenceManager = new PreferenceManager(getApplicationContext());
+        userId = preferenceManager.getString(Constants.KEY_USER_ID);
         init();
         loadUserDetails();
-        getToken();
         setListeners();
-        listenConversation();
     }
 
     private void init(){
-        conversations = new ArrayList<>();
-        conversationsAdapter = new RecentConversationsAdapter(conversations, this);
+        tcpClient = TcpClient.getInstance();
+        tcpClient.setUserId(userId);
+        tcpClient.setChatRoomHandler(new chatRoomHandler());
+        userManager = UserManager.getInstance(userId);
+        userManager.setActivityMainBinding(binding);
+        conversationsAdapter = new RecentConversationsAdapter(userManager.getChatRooms(), this);
+        userManager.setRecentConversationsAdapter(conversationsAdapter);
         binding.conversationsRecycleView.setAdapter(conversationsAdapter);
-        database = FirebaseFirestore.getInstance();
+        new FriendTask(binding,userId,conversationsAdapter).execute();
     }
 
     private void setListeners(){
@@ -71,94 +79,75 @@ public class MainActivity extends BaseActivity implements ConversionListener {
         Toast.makeText(getApplicationContext(), s, Toast.LENGTH_SHORT).show();
     }
 
-    private void listenConversation(){
-        database.collection(Constants.KEY_COLLECTION_CONVERSATIONS)
-                .whereEqualTo(Constants.KEY_SENDER_ID,preferenceManager.getString(Constants.KEY_USER_ID))
-                .addSnapshotListener(eventListener);
-        database.collection(Constants.KEY_COLLECTION_CONVERSATIONS)
-                .whereEqualTo(Constants.KEY_RECEIVER_ID,preferenceManager.getString(Constants.KEY_USER_ID))
-                .addSnapshotListener(eventListener);
-    }
-
-    private final EventListener<QuerySnapshot> eventListener = (value, error)->{
-        if (error!= null){
-            return;
-        }
-        if(value!=null){
-            for(DocumentChange documentChange:value.getDocumentChanges()){
-                if (documentChange.getType() == DocumentChange.Type.ADDED){
-                    String sendId = documentChange.getDocument().getString(Constants.KEY_SENDER_ID);
-                    String receiverId = documentChange.getDocument().getString(Constants.KEY_RECEIVER_ID);
-                    ChatMessage chatMessage = new ChatMessage();
-                    chatMessage.senderID = sendId;
-                    chatMessage.receiverId = receiverId;
-                    if (preferenceManager.getString(Constants.KEY_USER_ID).equals(sendId)){
-                        chatMessage.conversionImage = documentChange.getDocument().getString(Constants.KEY_RECEIVER_IMAGE);
-                        chatMessage.conversionName = documentChange.getDocument().getString(Constants.KEY_RECEIVER_NAME);
-                        chatMessage.conversionId = documentChange.getDocument().getString(Constants.KEY_RECEIVER_ID);
-                    }else {
-                        chatMessage.conversionImage = documentChange.getDocument().getString(Constants.KEY_SENDER_IMAGE);
-                        chatMessage.conversionName = documentChange.getDocument().getString(Constants.KEY_SENDER_NAME);
-                        chatMessage.conversionId = documentChange.getDocument().getString(Constants.KEY_SENDER_ID);
-                    }
-                    chatMessage.message=documentChange.getDocument().getString(Constants.KEY_LAST_MESSAGE);
-                    chatMessage.dateObject=documentChange.getDocument().getDate(Constants.KEY_TIMESTAMP);
-                    conversations.add(chatMessage);
-                }else if(documentChange.getType()==DocumentChange.Type.MODIFIED){
-                    for (int i=0;i<conversations.size();i++){
-                        String senderId = documentChange.getDocument().getString(Constants.KEY_SENDER_ID);
-                        String receiverId = documentChange.getDocument().getString(Constants.KEY_RECEIVER_ID);
-                        if(conversations.get(i).senderID.equals(senderId)&&conversations.get(i).receiverId.equals(receiverId)){
-                            conversations.get(i).message = documentChange.getDocument().getString(Constants.KEY_LAST_MESSAGE);
-                            conversations.get(i).dateObject=documentChange.getDocument().getDate(Constants.KEY_TIMESTAMP);
-                            break;
-                        }
-                    }
-                }
-            }
-            Collections.sort(conversations,(obj1,obj2)->obj2.dateObject.compareTo(obj1.dateObject));
-            conversationsAdapter.notifyDataSetChanged();
-            binding.conversationsRecycleView.smoothScrollToPosition(0);
-            binding.conversationsRecycleView.setVisibility(View.VISIBLE);
-            binding.progressBar.setVisibility(View.GONE);
-        }
-    };
-
-    private void getToken(){
-        FirebaseMessaging.getInstance().getToken().addOnSuccessListener(this::updateToken);
-    }
-    private void updateToken(String token){
-        preferenceManager.putString(Constants.KEY_FCM_TOKEN,token);
-        FirebaseFirestore database = FirebaseFirestore.getInstance();
-        DocumentReference documentReference=
-                database.collection(Constants.KEY_COLLECTION_USERS).document(
-                        preferenceManager.getString(Constants.KEY_USER_ID)
-                );
-        documentReference.update(Constants.KEY_FCM_TOKEN,token)
-                .addOnFailureListener(e -> notifyToast("Unable to update token"));
-    }
-
     private void signOut(){
         notifyToast("Signing out...");
-        FirebaseFirestore database = FirebaseFirestore.getInstance();
-        DocumentReference documentReference =
-                database.collection(Constants.KEY_COLLECTION_USERS).document(
-                        preferenceManager.getString(Constants.KEY_USER_ID)
-                );
-        HashMap<String,Object> updates= new HashMap<>();
-        updates.put(Constants.KEY_FCM_TOKEN, FieldValue.delete());
-        documentReference.update(updates)
-                .addOnSuccessListener(unused -> {
-                    preferenceManager.clear();
-                    startActivity(new Intent(getApplicationContext(),SignInActivity.class));
-                    finish();
-                })
-                .addOnFailureListener(e -> notifyToast("Unable to sign out"));
+        preferenceManager.clear();
+        tcpClient.stopListening();
+        userManager.clear();
+        startActivity(new Intent(getApplicationContext(),SignInActivity.class));
+        finish();
     }
     @Override
     public void onConversionClicked(User user) {
         Intent intent = new Intent(getApplicationContext(),ChatActivity.class);
         intent.putExtra(Constants.KEY_USER,user);
         startActivity(intent);
+    }
+
+    class chatRoomHandler extends Handler{
+        @Override
+        public void handleMessage(@NonNull Message msg) {
+            super.handleMessage(msg);
+            if(msg.arg1==0){
+                // ask for a new chatroom with a new friend
+                String id=(String) msg.obj;
+                new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        JsonObject obj = new JsonObject();
+                        obj.addProperty("aId",userId);
+                        obj.addProperty("bId",id);
+                        tcpClient.sendMessage("getChatRoom",obj);
+                    }
+                }).start();
+            }else if(msg.arg1==1){
+                // get a new chatroom with a new friend
+                JsonObject reply = (JsonObject) msg.obj;
+                if(!reply.get("success").getAsBoolean()){
+                    return;
+                }
+                String A = reply.get("A").getAsString();
+                String B = reply.get("B").getAsString();
+                String friend = userId.equals(A) ? B : A;
+                JsonArray messages = reply.get("messages").getAsJsonArray();
+                ArrayList<ChatMessage> chatMessages=new ArrayList<>();
+                String friendImage = userId.equals(A) ? reply.get("bImage").getAsString() : reply.get("aImage").getAsString();
+                String friendName = userId.equals(A) ? reply.get("bName").getAsString() : reply.get("aName").getAsString();
+                for(JsonElement m:messages){
+                    JsonObject message = m.getAsJsonObject();
+                    ChatMessage chatMessage = new ChatMessage();
+                    String senderReference = message.get("sender").getAsString();
+                    chatMessage.senderId = senderReference.equals("A") ? A : B;
+                    chatMessage.message = message.get("message").getAsString();
+                    Date date = new Date(message.get("timestamp").getAsJsonObject().get("seconds").getAsLong()*1000);
+                    chatMessage.dateObj = date;
+                    chatMessage.dateTime = getReadableDateTime(date);
+                    chatMessages.add(chatMessage);
+                }
+                userManager.addChatRoom(friend,chatMessages,friendName,friendImage);
+                conversationsAdapter.notifyItemInserted(userManager.getRoomNum()-1);
+                binding.conversationsRecycleView.smoothScrollToPosition(userManager.getRoomNum()-1);
+                binding.conversationsRecycleView.setVisibility(View.VISIBLE);
+            }
+            else if(msg.arg1==2){
+                // refresh last message
+                String friendId=(String)msg.obj;
+                conversationsAdapter.notifyItemChanged(userManager.getIndex(friendId));
+            }
+        }
+    }
+
+    private String getReadableDateTime(Date date) {
+        return new SimpleDateFormat("MMMM dd, yyyy - hh:mm a", Locale.getDefault()).format(date);
     }
 }
