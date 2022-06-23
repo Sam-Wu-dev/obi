@@ -31,7 +31,6 @@ public class TcpClient {
     private Handler chatRoomHandler;
     private Handler messageHandler;
     private UserManager userManager;
-
     public Handler getChatRoomHandler() {
         return chatRoomHandler;
     }
@@ -88,17 +87,30 @@ public class TcpClient {
         obj.addProperty("type",type);
         obj.add("message",message);
         String s = obj.toString();
-        Runnable runnable = () -> {
             if (mBufferOut != null) {
                 Log.d("test", "Sending: " + s +" to server");
                 Log.d("test", "Size of sending message: "+s.length());
                 mBufferOut.println(s);
                 mBufferOut.flush();
             }
-        };
-        Thread thread = new Thread(runnable);
-        thread.start();
     }
+
+//    public void sendMessage(String type,final JsonObject message) {
+//        JsonObject obj=new JsonObject();
+//        obj.addProperty("type",type);
+//        obj.add("message",message);
+//        String s = obj.toString();
+//        Runnable runnable = () -> {
+//            if (mBufferOut != null) {
+//                Log.d("test", "Sending: " + s +" to server");
+//                Log.d("test", "Size of sending message: "+s.length());
+//                mBufferOut.println(s);
+//                mBufferOut.flush();
+//            }
+//        };
+//        Thread thread = new Thread(runnable);
+//        thread.start();
+//    }
 
     /**
      * Close the connection and release the members
